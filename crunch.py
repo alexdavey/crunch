@@ -67,36 +67,43 @@ def load_tensorboard_scalars(
 def load_wandb_scalars(
     tag: str,
     project: str,
-    metric: str = "eval/poleval",
-    step: str = "global_step",
     timeout: int = 30,
+    **keys: str,
 ):
+    if not keys:
+        raise ValueError("At least one key must be provided")
+
     api = wandb.Api(timeout=timeout)
     runs = api.runs(path=project, filters={"tags": tag})
 
-    results = {}
+    wandb_keys = list(keys.values())
+    results = []
 
     for run in runs:
-        steps = []
-        values = []
+        collected = {name: [] for name in keys}
+
         data = run.scan_history(
-            keys=[step, metric], page_size=100000, min_step=None, max_step=None
+            keys=wandb_keys,
+            page_size=100000,
+            min_step=None,
+            max_step=None,
         )
 
         for entry in data:
-            if metric in entry:
-                steps.append(entry[step])
-                values.append(entry[metric])
+            for out_name, wandb_key in keys.items():
+                if wandb_key in entry:
+                    collected[out_name].append(entry[wandb_key])
 
-        seed = run.config["seed"]
-
-        if seed in results:
-            raise ValueError(f"Tag {tag} has duplicate seed {seed}!")
-
-        results[seed] = {
-            step: np.array(steps),
-            metric: np.array(values),
+        result = {
+            "name": run.name,
+            "id": run.id,
+            "seed": run.config.get("seed"),
         }
+
+        for name, values in collected.items():
+            result[name] = np.array(values)
+
+        results.append(result)
 
     return results
 
