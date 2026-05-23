@@ -1,3 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "Crunch"
+name = "crunch"
 version = "0.0.0"
+description = "Utilities for loading TensorBoard and Weights & Biases scalar data."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "tensorboard",
+    "wandb",
+]
+
+[tool.setuptools]
+py-modules = ["crunch"]
