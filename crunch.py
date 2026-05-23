@@ -48,8 +48,15 @@ def load_tensorboard_scalars(
     filter_tag: str | None = None,
     include_empty: bool = False,
 ):
-    event_files = find_event_files(log_dir)
-    inputs = [(file, log_dir, filter_tag) for file in event_files]
+    path = Path(log_dir).expanduser()
+    if not path.exists():
+        raise FileNotFoundError(f"log_dir does not exist: {path}")
+    if not path.is_dir():
+        raise NotADirectoryError(f"log_dir is not a directory: {path}")
+
+    normalized_log_dir = str(path)
+    event_files = find_event_files(normalized_log_dir)
+    inputs = [(file, normalized_log_dir, filter_tag) for file in event_files]
 
     all_scalars_raw = Pool().map(process_file, inputs)
 
