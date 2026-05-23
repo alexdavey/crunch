@@ -122,9 +122,6 @@ def load_wandb_scalars(
             ``accuracy="eval/accuracy"`` stores that history under
             ``"accuracy"`` in each returned run.
 
-    Raises:
-        ValueError: If no history keys are provided.
-
     Returns:
         A list of run dictionaries containing run metadata and NumPy arrays for
         each requested history key.
@@ -133,7 +130,18 @@ def load_wandb_scalars(
         raise ValueError("At least one key must be provided")
 
     api = wandb.Api(timeout=timeout)
+
+    try:
+        len(api.runs(path=project, per_page=1, include_sweeps=False))
+    except ValueError as e:
+        raise ValueError(
+            f"W&B project does not exist or is not accessible: {project!r}"
+        ) from e
+
     runs = api.runs(path=project, filters={"tags": tag})
+
+    if len(runs) == 0:
+        raise ValueError(f"No W&B runs found in {project!r} with tag {tag!r}")
 
     wandb_keys = list(keys.values())
     results: list[WandbRunData] = []
