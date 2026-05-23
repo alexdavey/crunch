@@ -1,120 +1,56 @@
 # Crunch
 
-Small utilities for collecting experiment scalar data from TensorBoard and
-Weights & Biases, plus simple pickle save/load helpers.
+Utilities for loading experiment scalar data from Weights & Biases and
+TensorBoard as pandas DataFrames, plus small pickle helpers.
 
 ## Installation
 
-Install the package in editable mode from this directory:
-
 ```bash
-pip install -e .
+pip install "git+https://github.com/alexdavey/crunch.git"
 ```
 
-The module imports `numpy`, `wandb`, and TensorBoard's event accumulator, so make
-sure those packages are available in the Python environment where you use it.
+## Weights & Biases
 
-## Weights & Biases Scalars
-
-Load selected history keys for all runs in a project that have a given tag:
+`load_wandb_scalars` loads selected history keys for all runs in a project with
+a given tag. It returns a wide DataFrame by default: one row per run and W&B
+`_step`, with one column per requested metric.
 
 ```python
 from crunch import load_wandb_scalars
 
-runs = load_wandb_scalars(
+df = load_wandb_scalars(
     tag="baseline",
     project="entity/project",
     accuracy="eval/accuracy",
     loss="train/loss",
 )
-
-for run in runs:
-    print(run["name"], run["id"], run["seed"])
-    print(run["accuracy"])
 ```
 
-Keyword argument names become output field names. Keyword argument values are
-the W&B history keys to scan.
+The DataFrame columns are `run_name`, `run_id`, `seed`, `step`, followed by the
+requested metric names such as `accuracy` and `loss`. These metadata names are
+reserved and cannot be used as requested metric names.
 
-`load_wandb_scalars` returns a list of dictionaries, one dictionary per W&B run.
-Each dictionary contains:
+Pass `format="dict"` to return a list of dictionaries instead.
 
-- `name`: the W&B run name.
-- `id`: the W&B run id.
-- `seed`: the `seed` value from the run config, or `None` if it is absent.
-- One NumPy array per requested scalar, keyed by the keyword argument name used
-  in the call.
+## TensorBoard
 
-For example, this call:
-
-```python
-runs = load_wandb_scalars(
-    tag="baseline",
-    project="entity/project",
-    accuracy="eval/accuracy",
-)
-```
-
-returns data shaped like:
-
-```python
-[
-    {
-        "name": "run-1",
-        "id": "abc123",
-        "seed": 0,
-        "accuracy": np.array([...]),
-    },
-]
-```
-
-## TensorBoard Scalars
-
-Load all scalar series from TensorBoard event files under a log directory:
+`load_tensorboard_scalars` loads scalar series from TensorBoard event files
+under a log directory. It returns a wide DataFrame by default: one row per run
+and step, with one column per TensorBoard scalar tag.
 
 ```python
 from crunch import load_tensorboard_scalars
 
-scalars = load_tensorboard_scalars("~/runs")
-
-for run_name, run_data in scalars.items():
-    print(run_name, run_data["full_filepath"])
-    for tag, series in run_data.items():
-        if tag == "full_filepath":
-            continue
-        print(tag, series["steps"], series["values"])
+df = load_tensorboard_scalars("~/runs")
+df = load_tensorboard_scalars("~/runs", filter_tag="val/accuracy")
 ```
 
-Restrict loading to one scalar tag:
+The DataFrame columns are `run_name`, `full_filepath`, `step`, followed by the
+scalar tag columns. These metadata names are reserved and cannot be used as
+TensorBoard scalar tag names in DataFrame output.
 
-```python
-scalars = load_tensorboard_scalars("~/runs", filter_tag="val/accuracy")
-```
-
-By default, event files without matching scalar data are skipped. Set
-`include_empty=True` to keep them in the returned mapping.
-
-`load_tensorboard_scalars` returns a dictionary keyed by run name. Each run name
-is the event file's parent directory relative to the input `log_dir`. Each value
-is another dictionary containing:
-
-- `full_filepath`: the path to the TensorBoard event file.
-- One entry per scalar tag. Each tag maps to a dictionary with `steps` and
-  `values` lists.
-
-For example:
-
-```python
-{
-    "experiment-1/seed-0": {
-        "full_filepath": "/logs/experiment-1/seed-0/events.out.tfevents...",
-        "val/accuracy": {
-            "steps": [0, 1, 2],
-            "values": [0.42, 0.55, 0.61],
-        },
-    },
-}
-```
+Pass `format="dict"` to return a nested dictionary instead. In dict mode,
+`include_empty=True` keeps event files without matching scalar data.
 
 ## Pickle Helpers
 
@@ -124,6 +60,3 @@ from crunch import load_pickle, save_pickle
 save_pickle("results.pkl", {"accuracy": 0.91})
 results = load_pickle("results.pkl")
 ```
-
-`save_pickle` uses the highest pickle protocol available in the current Python
-runtime.
